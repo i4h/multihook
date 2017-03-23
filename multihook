@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# Multihook Script
+# This script determines the kind of hook it is
+# (pre-commit, post-update, ...
+# and then calls all the scripts in the corresponding .d folder
+# (e.g. pre-commit.d). At the first failure the script exits with
+# an error
+
+# See github.com/i4h/multihook for more infos
+
+
+hooksdir=$(dirname $0)
+hook=$(basename $0)
+subhooksdir=$hooksdir"/"$hook".d"
+
+EXIT_SUCCESS=0
+EXIT_ERROR=1
+
+# Uncomment to continue running hooks after first failure
+FAILFAST=true
+
+# Check for subhooks directory
+if [ ! -d "$subhooksdir" ] ; then
+    echo "Multihook: Hook directory $subhooksdir does not exist. Continuing."
+    exit $EXIT_SUCCESS;
+fi
+
+# Find subhooks
+subhooks=$(find $subhooksdir -maxdepth 1 -executable -type f | sort)
+if [ -z $subhooks ] ; then
+    echo "Multihook: No executable files found in $subhooksdir. Continuing."
+    exit $EXIT_SUCCESS;
+fi
+
+# Run subhooks and exit on error if FAILFAST is true
+success=true
+for subhook in $subhooks; do
+    subhookname=$(basename $subhook)
+    echo "Multihook: Running $hook hook $subhookname"
+    if ! $subhook ; then
+	echo $hook" multihook: Subhook " $subhookname " failed".
+	success=false
+	if $FAILFAST ; then
+	    exit $EXIT_ERROR
+	fi
+    fi
+done
+
+# Exit
+if $success ; then 
+    exit $EXIT_SUCCESS
+else
+    exit $EXIT_ERROR
+fi
